@@ -23,6 +23,10 @@ Parameters:
         Description: Choose which subnets this ECS cluster should be deployed to
         Type: String
         
+    KeyName:
+        Description: KeyName
+        Type: AWS::EC2::KeyPair::KeyName
+
     ProxyHost:
         Description: Proxy host.
         Type: String
@@ -63,6 +67,7 @@ Resources:
                 VPC: !Ref VPC
                 SecurityGroup: !GetAtt SecurityGroups.Outputs.ECSHostSecurityGroup
                 Subnets: !Ref Subnets
+                KeyName: !Ref KeyName
                 ProxyHost: !Ref ProxyHost
                 ProxyPort: !Ref ProxyPort
 

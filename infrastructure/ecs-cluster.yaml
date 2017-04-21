@@ -30,6 +30,11 @@ Parameters:
         Description: Select the Security Group to use for the ECS cluster hosts
         Type: AWS::EC2::SecurityGroup::Id
 
+    KeyName:
+        Description: KeyName
+        Type: String
+        Default: ""
+
     ProxyHost:
         Description: Proxy host
         Type: String
@@ -37,6 +42,10 @@ Parameters:
     ProxyPort:
         Description: Proxy port
         Type: Number
+
+Conditions:
+    AddKey:
+        !Not [ !Equals [ !Ref KeyName, "" ] ]
 
 Mappings:
 
@@ -99,7 +108,7 @@ Resources:
                 Timeout: PT15M
         UpdatePolicy:
             AutoScalingRollingUpdate:
-                MinInstancesInService: 1
+                MinInstancesInService: 0
                 MaxBatchSize: 1
                 PauseTime: PT15M
                 WaitOnResourceSignals: true
@@ -112,6 +121,7 @@ Resources:
             SecurityGroups: 
                 - !Ref SecurityGroup
             IamInstanceProfile: !Ref ECSInstanceProfile
+            KeyName: !If [AddKey, !Ref KeyName, !Ref "AWS::NoValue"]
             UserData: 
                 "Fn::Base64": !Sub |
                     #cloud-boothook

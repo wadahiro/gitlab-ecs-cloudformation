@@ -26,6 +26,7 @@ Resources:
         Type: AWS::ElasticLoadBalancingV2::LoadBalancer
         Properties:
             Name: !Ref EnvironmentName
+            Scheme: internal
             Subnets: !Ref Subnets
             SecurityGroups: 
                 - !Ref SecurityGroup
