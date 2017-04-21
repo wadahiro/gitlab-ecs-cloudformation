@@ -30,6 +30,14 @@ Parameters:
         Description: Select the Security Group to use for the ECS cluster hosts
         Type: AWS::EC2::SecurityGroup::Id
 
+    ProxyHost:
+        Description: Proxy host
+        Type: String
+
+    ProxyPort:
+        Description: Proxy port
+        Type: Number
+
 Mappings:
 
     # These are the latest ECS optimized AMIs as of February 2017:
@@ -106,7 +114,32 @@ Resources:
             IamInstanceProfile: !Ref ECSInstanceProfile
             UserData: 
                 "Fn::Base64": !Sub |
+                    #cloud-boothook
                     #!/bin/bash
+
+                    PROXY_HOST=${ProxyHost}
+                    PROXY_PORT=${ProxyPort}
+
+                    # Set Yum HTTP proxy
+                    if [ ! -f /var/lib/cloud/instance/sem/config_yum_http_proxy ]; then
+                        echo "proxy=http://$PROXY_HOST:$PROXY_PORT" >> /etc/yum.conf
+                        echo "$$: $(date +%s.%N | cut -b1-13)" > /var/lib/cloud/instance/sem/config_yum_http_proxy
+                    fi
+
+                    # Set Docker HTTP proxy
+                    if [ ! -f /var/lib/cloud/instance/sem/config_docker_http_proxy ]; then
+                        echo "export http_proxy=http://$PROXY_HOST:$PROXY_PORT/" >> /etc/sysconfig/docker
+                        echo "$$: $(date +%s.%N | cut -b1-13)" > /var/lib/cloud/instance/sem/config_docker_http_proxy
+                    fi
+
+                    # Set ECS agent HTTP proxy
+                    if [ ! -f /var/lib/cloud/instance/sem/config_ecs-agent_http_proxy ]; then
+                        echo "ECS_CLUSTER=${ECSCluster}" >> /etc/ecs/ecs.config
+                        echo "HTTP_PROXY=$PROXY_HOST:$PROXY_PORT" >> /etc/ecs/ecs.config
+                        echo "NO_PROXY=169.254.169.254,169.254.170.2,/var/run/docker.sock" >> /etc/ecs/ecs.config
+                        echo "$$: $(date +%s.%N | cut -b1-13)" > /var/lib/cloud/instance/sem/config_ecs-agent_http_proxy
+                    fi
+
                     yum install -y aws-cfn-bootstrap
                     /opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSLaunchConfiguration
                     /opt/aws/bin/cfn-signal -e $? --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSAutoScalingGroup
@@ -114,9 +147,6 @@ Resources:
         Metadata:
             AWS::CloudFormation::Init:
                 config:
-                    commands:
-                        01_add_instance_to_cluster:
-                            command: !Sub echo ECS_CLUSTER=${ECSCluster} >> /etc/ecs/ecs.config
                     files:
                         "/etc/cfn/cfn-hup.conf":
                             mode: 000400

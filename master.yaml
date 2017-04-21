@@ -14,56 +14,64 @@ Description: >
     Last Modified: 22nd September 2016
     Author: Paul Maddox <pmaddox@amazon.com>
 
-Resources:
-
+Parameters:
     VPC:
-        Type: AWS::CloudFormation::Stack
-        Properties:
-            TemplateURL: https://s3.amazonaws.com/ecs-refarch-cloudformation/infrastructure/vpc.yaml
-            Parameters:
-                EnvironmentName:    !Ref AWS::StackName
-                VpcCIDR:            10.180.0.0/16
-                PublicSubnet1CIDR:  10.180.8.0/21
-                PublicSubnet2CIDR:  10.180.16.0/21
-                PrivateSubnet1CIDR: 10.180.24.0/21
-                PrivateSubnet2CIDR: 10.180.32.0/21
+        Description: VPC Id like 'vpc-18ac277d'.
+        Type: AWS::EC2::VPC::Id
+        
+    Subnets:
+        Description: Choose which subnets this ECS cluster should be deployed to
+        Type: String
+        
+    ProxyHost:
+        Description: Proxy host.
+        Type: String
+        
+    ProxyPort:
+        Description: Proxy port.
+        Type: Number
+        
+
+Resources:
 
     SecurityGroups:
         Type: AWS::CloudFormation::Stack
         Properties:
-            TemplateURL: https://s3.amazonaws.com/ecs-refarch-cloudformation/infrastructure/security-groups.yaml
+            TemplateURL: infrastructure/security-groups.yaml
             Parameters: 
                 EnvironmentName: !Ref AWS::StackName
-                VPC: !GetAtt VPC.Outputs.VPC
+                VPC: !Ref VPC
 
     ALB:
         Type: AWS::CloudFormation::Stack
         Properties:
-            TemplateURL: https://s3.amazonaws.com/ecs-refarch-cloudformation/infrastructure/load-balancers.yaml
+            TemplateURL: infrastructure/load-balancers.yaml
             Parameters:
                 EnvironmentName: !Ref AWS::StackName
-                VPC: !GetAtt VPC.Outputs.VPC
-                Subnets: !GetAtt VPC.Outputs.PublicSubnets
+                VPC: !Ref VPC
+                Subnets: !Ref Subnets
                 SecurityGroup: !GetAtt SecurityGroups.Outputs.LoadBalancerSecurityGroup
 
     ECS:
         Type: AWS::CloudFormation::Stack
         Properties:
-            TemplateURL: https://s3.amazonaws.com/ecs-refarch-cloudformation/infrastructure/ecs-cluster.yaml
+            TemplateURL: infrastructure/ecs-cluster.yaml
             Parameters:
                 EnvironmentName: !Ref AWS::StackName
-                InstanceType: t2.large
-                ClusterSize: 4
-                VPC: !GetAtt VPC.Outputs.VPC
+                InstanceType: t2.micro
+                ClusterSize: 1
+                VPC: !Ref VPC
                 SecurityGroup: !GetAtt SecurityGroups.Outputs.ECSHostSecurityGroup
-                Subnets: !GetAtt VPC.Outputs.PrivateSubnets
+                Subnets: !Ref Subnets
+                ProxyHost: !Ref ProxyHost
+                ProxyPort: !Ref ProxyPort
 
     ProductService:
         Type: AWS::CloudFormation::Stack
         Properties:
-            TemplateURL: https://s3.amazonaws.com/ecs-refarch-cloudformation/services/product-service/service.yaml
+            TemplateURL: services/product-service/service.yaml
             Parameters:
-                VPC: !GetAtt VPC.Outputs.VPC
+                VPC: !Ref VPC
                 Cluster: !GetAtt ECS.Outputs.Cluster
                 DesiredCount: 2
                 Listener: !GetAtt ALB.Outputs.Listener 
@@ -72,9 +80,9 @@ Resources:
     WebsiteService:
         Type: AWS::CloudFormation::Stack
         Properties:
-            TemplateURL: https://s3.amazonaws.com/ecs-refarch-cloudformation/services/website-service/service.yaml
+            TemplateURL: services/website-service/service.yaml
             Parameters:
-                VPC: !GetAtt VPC.Outputs.VPC
+                VPC: !Ref VPC
                 Cluster: !GetAtt ECS.Outputs.Cluster
                 DesiredCount: 2
                 ProductServiceUrl: !Join [ "/", [ !GetAtt ALB.Outputs.LoadBalancerUrl, "products" ]]
