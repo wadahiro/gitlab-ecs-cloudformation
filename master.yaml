@@ -27,6 +27,10 @@ Parameters:
         Description: KeyName
         Type: AWS::EC2::KeyPair::KeyName
 
+    RootCACrt:
+        Description: ROOT CA Certificate
+        Type: String
+
     ProxyHost:
         Description: Proxy host.
         Type: String
@@ -35,6 +39,43 @@ Parameters:
         Description: Proxy port.
         Type: Number
         
+    GitLabURL:
+        Description: GitLab URL
+        Type: String
+
+    RunnerRegistrationToken:
+        Description: Runner registration token
+        Type: String
+
+    RunnerConcurrent:
+        Description: Runner Concurrent
+        Type: Number
+
+    RunnerCheckInterval:
+        Description: Runner check interval
+        Type: Number
+
+    RunnerEnvironment:
+        Description: Runner environment
+        Type: String
+
+    RunnerDNS:
+        Description: Runner dns
+        Type: String
+
+    RunnerExtraHosts:
+        Description: Runner extra_hosts
+        Type: String
+
+    RunnerPrivileged:
+        Description: Runner privileged
+        Type: String
+        Default: false
+
+    RunnerPullPolicy:
+        Description: Runner pull_policy
+        Type: String
+        Default: if-not-present
 
 Resources:
 
@@ -68,32 +109,18 @@ Resources:
                 SecurityGroup: !GetAtt SecurityGroups.Outputs.ECSHostSecurityGroup
                 Subnets: !Ref Subnets
                 KeyName: !Ref KeyName
+                RootCACrt: !Ref RootCACrt
                 ProxyHost: !Ref ProxyHost
                 ProxyPort: !Ref ProxyPort
-
-    ProductService:
-        Type: AWS::CloudFormation::Stack
-        Properties:
-            TemplateURL: services/product-service/service.yaml
-            Parameters:
-                VPC: !Ref VPC
-                Cluster: !GetAtt ECS.Outputs.Cluster
-                DesiredCount: 2
-                Listener: !GetAtt ALB.Outputs.Listener 
-                Path: /products
-
-    WebsiteService:
-        Type: AWS::CloudFormation::Stack
-        Properties:
-            TemplateURL: services/website-service/service.yaml
-            Parameters:
-                VPC: !Ref VPC
-                Cluster: !GetAtt ECS.Outputs.Cluster
-                DesiredCount: 2
-                ProductServiceUrl: !Join [ "/", [ !GetAtt ALB.Outputs.LoadBalancerUrl, "products" ]]
-                Listener: !GetAtt ALB.Outputs.Listener 
-                Path: /
-
+                GitLabURL: !Ref GitLabURL
+                RunnerRegistrationToken: !Ref RunnerRegistrationToken
+                RunnerConcurrent: !Ref RunnerConcurrent
+                RunnerCheckInterval: !Ref RunnerCheckInterval
+                RunnerEnvironment: !Ref RunnerEnvironment
+                RunnerDNS: !Ref RunnerDNS
+                RunnerExtraHosts: !Ref RunnerExtraHosts
+                RunnerPrivileged: !Ref RunnerPrivileged
+                RunnerPullPolicy: !Ref RunnerPullPolicy
 
 Outputs:
 

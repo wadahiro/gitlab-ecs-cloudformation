@@ -35,6 +35,10 @@ Parameters:
         Type: String
         Default: ""
 
+    RootCACrt:
+        Description: ROOT CA Certificate
+        Type: String
+
     ProxyHost:
         Description: Proxy host
         Type: String
@@ -42,6 +46,51 @@ Parameters:
     ProxyPort:
         Description: Proxy port
         Type: Number
+
+    GitLabURL:
+        Description: GitLab URL
+        Type: String
+
+    RunnerRegistrationToken:
+        Description: Runner registration token
+        Type: String
+        Default: ""
+
+    RunnerConcurrent:
+        Description: Runner Concurrent
+        Type: Number
+        Default: 1
+
+    RunnerCheckInterval:
+        Description: Runner check interval
+        Type: Number
+        Default: 0
+
+    RunnerEnvironment:
+        Description: Runner environment
+        Type: String
+        Default: ""
+
+    RunnerDNS:
+        Description: Runner dns
+        Type: String
+        Default: ""
+
+    RunnerExtraHosts:
+        Description: Runner extra_hosts
+        Type: String
+        Default: ""
+
+    RunnerPrivileged:
+        Description: Runner privileged
+        Type: String
+        Default: false
+
+    RunnerPullPolicy:
+        Description: Runner pull_policy
+        Type: String
+        Default: if-not-present
+
 
 Conditions:
     AddKey:
@@ -76,7 +125,7 @@ Mappings:
         eu-central-1:
             AMI: ami-ec2be583
         ap-northeast-1:
-            AMI: ami-c393d6a4
+            AMI: ami-f63f6f91
         ap-southeast-1:
             AMI: ami-a88530cb
         ap-southeast-2:
@@ -104,11 +153,14 @@ Resources:
                   Value: !Sub ${EnvironmentName} ECS host
                   PropagateAtLaunch: true
         CreationPolicy:
+            AutoScalingCreationPolicy:
+                MinSuccessfulInstancesPercent: 0
             ResourceSignal: 
                 Timeout: PT15M
         UpdatePolicy:
             AutoScalingRollingUpdate:
                 MinInstancesInService: 0
+                MinSuccessfulInstancesPercent: 0
                 MaxBatchSize: 1
                 PauseTime: PT15M
                 WaitOnResourceSignals: true
@@ -129,6 +181,14 @@ Resources:
 
                     PROXY_HOST=${ProxyHost}
                     PROXY_PORT=${ProxyPort}
+
+                    # Update ROOT CA Certificate
+                    cat << EOS > /etc/pki/ca-trust/source/anchors/rootca.crt
+                    -----BEGIN CERTIFICATE-----
+                    ${RootCACrt}
+                    -----END CERTIFICATE-----
+                    EOS
+                    update-ca-trust
 
                     # Set Yum HTTP proxy
                     if [ ! -f /var/lib/cloud/instance/sem/config_yum_http_proxy ]; then
@@ -151,12 +211,16 @@ Resources:
                     fi
 
                     yum install -y aws-cfn-bootstrap
-                    /opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSLaunchConfiguration
-                    /opt/aws/bin/cfn-signal -e $? --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSAutoScalingGroup
+                    /opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSLaunchConfiguration --http-proxy=http://$PROXY_HOST:$PROXY_PORT --https-proxy=http://$PROXY_HOST:$PROXY_PORT
+                    /opt/aws/bin/cfn-signal -e $? --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSAutoScalingGroup --http-proxy=http://$PROXY_HOST:$PROXY_PORT --https-proxy=http://$PROXY_HOST:$PROXY_PORT
 
         Metadata:
             AWS::CloudFormation::Init:
                 config:
+                    commands:
+                        gitlab_runner_register:
+                            command: !Sub |
+                                ps -ef | grep docker >> /var/log/gitlab-runner-register.log 
                     files:
                         "/etc/cfn/cfn-hup.conf":
                             mode: 000400
@@ -172,7 +236,49 @@ Resources:
                                 [cfn-auto-reloader-hook]
                                 triggers=post.update
                                 path=Resources.ContainerInstances.Metadata.AWS::CloudFormation::Init
-                                action=/opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSLaunchConfiguration
+                                action=/opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSLaunchConfiguration --http-proxy=http://${ProxyHost}:${ProxyPort} --https-proxy=http://${ProxyHost}:${ProxyPort}
+
+                        "/srv/gitlab-runner/config/config.toml":
+                            content: !Sub |
+                                concurrent = ${RunnerConcurrent}
+                                check_interval = ${RunnerCheckInterval}
+
+                        "/etc/init/gitlab-runner-register.conf":
+                            mode: "000644"
+                            owner: root
+                            group: root
+                            content: !Sub |
+                               description "Register gitlab runner on Amazon ECS container instance"
+                               author "wadahiro@gmail.com"
+                               start on started ecs
+                               
+                               script
+                                   exec 2>>/var/log/gitlab-runner-register.log
+                                   set -x
+                               
+                                   until curl -s http://localhost:51678/v1/metadata
+                                   do
+                                       sleep 1
+                                   done
+                               
+                                   docker run \
+                                     --rm \
+                                     -v /srv/gitlab-runner/config:/etc/gitlab-runner \
+                                     --dns ${RunnerDNS} \
+                                     gitlab/gitlab-runner:alpine-v1.11.1 register \
+                                     --non-interactive \
+                                     --url "${GitLabURL}" \
+                                     --registration-token "${RunnerRegistrationToken}" \
+                                     --executor "docker" \
+                                     --docker-image busyboox \
+                                     --env ${RunnerEnvironment} \
+                                     --docker-dns ${RunnerDNS} \
+                                     --docker-privileged=${RunnerPrivileged} \
+                                     --docker-extra-hosts=${RunnerExtraHosts} \
+                                     --docker-volumes=/var/run/docker.sock:/var/run/docker.sock \
+                                     --docker-pull-policy=${RunnerPullPolicy}
+
+                               end script
 
                     services: 
                         sysvinit:
