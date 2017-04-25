@@ -1,0 +1,75 @@
+Description: >
+    This template deploys gitlab-runner.
+
+Parameters: 
+
+    VPC:
+        Description: The VPC that the ECS cluster is deployed to
+        Type: AWS::EC2::VPC::Id
+        
+    Cluster:
+        Description: Please provide the ECS Cluster ID that this service should run on
+        Type: String
+
+    MaximumPercent:
+        Description: The maximum number of tasks, specified as a percentage of the DesiredCount.
+        Type: Number
+        Default: 100
+
+    MinimumHealthyPercent:
+        Description: The minimum number of tasks, specified as a percentage of the DesiredCount.
+        Type: Number
+        Default: 0
+
+    DesiredCount: 
+        Description: How many instances of this task should we run across our cluster?
+        Type: Number
+        Default: 1
+
+    DNSServer:
+        Description: DNS server
+        Type: String
+
+Resources:
+
+    Service: 
+        Type: AWS::ECS::Service
+        Properties: 
+            Cluster: !Ref Cluster
+            DeploymentConfiguration:
+                MaximumPercent: !Ref MaximumPercent
+                MinimumHealthyPercent: !Ref MinimumHealthyPercent
+            DesiredCount: !Ref DesiredCount
+            TaskDefinition: !Ref TaskDefinition
+
+    TaskDefinition:
+        Type: AWS::ECS::TaskDefinition
+        Properties:
+            Family: gitlab-runner-task
+            ContainerDefinitions:
+                - Name: gitlab-runer
+                  Essential: true
+                  Image: gitlab/gitlab-runner:alpine-v1.11.1
+                  Memory: 512
+                  MountPoints:
+                      - SourceVolume: gitlab-runner-config 
+                        ContainerPath: /etc/gitlab-runner
+                  DnsServers:
+                      - !Ref DNSServer
+                  LogConfiguration:
+                      LogDriver: awslogs
+                      Options:
+                          awslogs-group: !Sub ${Cluster}/gitlab-runner
+                          awslogs-region: !Ref AWS::Region
+                          awslogs-stream-prefix: gitlab-runner
+            Volumes:
+                - Name: gitlab-runner-config
+                  Host:
+                      SourcePath: /srv/gitlab-runner/config
+
+    CloudWatchLogsGroup:
+        Type: AWS::Logs::LogGroup
+        Properties: 
+            LogGroupName: !Sub ${Cluster}/gitlab-runner
+            RetentionInDays: 7  
+

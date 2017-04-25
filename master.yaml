@@ -11,8 +11,7 @@ Description: >
     Finally, it deploys a pair of example ECS services from containers published in 
     Amazon EC2 Container Registry (Amazon ECR).
 
-    Last Modified: 22nd September 2016
-    Author: Paul Maddox <pmaddox@amazon.com>
+    Last Modified: 22nd September 2016 Author: Paul Maddox <pmaddox@amazon.com>
 
 Parameters:
     VPC:
@@ -39,6 +38,15 @@ Parameters:
         Description: Proxy port.
         Type: Number
         
+    DNSServer:
+        Description: DNS server
+        Type: String
+
+    TheNumberOfRunners:
+        Description: The number of gitlab runners.
+        Type: Number
+        Default: 1
+        
     GitLabURL:
         Description: GitLab URL
         Type: String
@@ -57,10 +65,6 @@ Parameters:
 
     RunnerEnvironment:
         Description: Runner environment
-        Type: String
-
-    RunnerDNS:
-        Description: Runner dns
         Type: String
 
     RunnerExtraHosts:
@@ -97,14 +101,14 @@ Resources:
                 Subnets: !Ref Subnets
                 SecurityGroup: !GetAtt SecurityGroups.Outputs.LoadBalancerSecurityGroup
 
-    ECS:
+    RunnersECS:
         Type: AWS::CloudFormation::Stack
         Properties:
             TemplateURL: infrastructure/ecs-cluster.yaml
             Parameters:
-                EnvironmentName: !Ref AWS::StackName
+                EnvironmentName: !Sub ${AWS::StackName}-gitlab-runners
                 InstanceType: t2.micro
-                ClusterSize: 1
+                ClusterSize: !Ref TheNumberOfRunners
                 VPC: !Ref VPC
                 SecurityGroup: !GetAtt SecurityGroups.Outputs.ECSHostSecurityGroup
                 Subnets: !Ref Subnets
@@ -112,15 +116,25 @@ Resources:
                 RootCACrt: !Ref RootCACrt
                 ProxyHost: !Ref ProxyHost
                 ProxyPort: !Ref ProxyPort
+                DNSServer: !Ref DNSServer
                 GitLabURL: !Ref GitLabURL
                 RunnerRegistrationToken: !Ref RunnerRegistrationToken
                 RunnerConcurrent: !Ref RunnerConcurrent
                 RunnerCheckInterval: !Ref RunnerCheckInterval
                 RunnerEnvironment: !Ref RunnerEnvironment
-                RunnerDNS: !Ref RunnerDNS
                 RunnerExtraHosts: !Ref RunnerExtraHosts
                 RunnerPrivileged: !Ref RunnerPrivileged
                 RunnerPullPolicy: !Ref RunnerPullPolicy
+
+    GitLabRunner:
+        Type: AWS::CloudFormation::Stack
+        Properties:
+            TemplateURL: services/gitlab-runner/service.yaml
+            Parameters:
+                VPC: !Ref VPC
+                Cluster: !GetAtt RunnersECS.Outputs.Cluster
+                DesiredCount: !Ref TheNumberOfRunners
+                DNSServer: !Ref DNSServer
 
 Outputs:
 
@@ -131,3 +145,4 @@ Outputs:
     WebsiteServiceUrl: 
         Description: The URL endpoint for the website service
         Value: !Join ["", [ !GetAtt ALB.Outputs.LoadBalancerUrl, "/" ]]
+

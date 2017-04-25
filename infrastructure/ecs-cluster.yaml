@@ -47,6 +47,11 @@ Parameters:
         Description: Proxy port
         Type: Number
 
+    DNSServer:
+        Description: DNS server
+        Type: String
+        Default: ""
+
     GitLabURL:
         Description: GitLab URL
         Type: String
@@ -68,11 +73,6 @@ Parameters:
 
     RunnerEnvironment:
         Description: Runner environment
-        Type: String
-        Default: ""
-
-    RunnerDNS:
-        Description: Runner dns
         Type: String
         Default: ""
 
@@ -181,6 +181,7 @@ Resources:
 
                     PROXY_HOST=${ProxyHost}
                     PROXY_PORT=${ProxyPort}
+                    NO_PROXY=169.254.169.254,169.254.170.2,/var/run/docker.sock
 
                     # Update ROOT CA Certificate
                     cat << EOS > /etc/pki/ca-trust/source/anchors/rootca.crt
@@ -199,6 +200,7 @@ Resources:
                     # Set Docker HTTP proxy
                     if [ ! -f /var/lib/cloud/instance/sem/config_docker_http_proxy ]; then
                         echo "export http_proxy=http://$PROXY_HOST:$PROXY_PORT/" >> /etc/sysconfig/docker
+                        echo "export no_proxy=$NO_PROXY" >> /etc/sysconfig/docker
                         echo "$$: $(date +%s.%N | cut -b1-13)" > /var/lib/cloud/instance/sem/config_docker_http_proxy
                     fi
 
@@ -206,7 +208,7 @@ Resources:
                     if [ ! -f /var/lib/cloud/instance/sem/config_ecs-agent_http_proxy ]; then
                         echo "ECS_CLUSTER=${ECSCluster}" >> /etc/ecs/ecs.config
                         echo "HTTP_PROXY=$PROXY_HOST:$PROXY_PORT" >> /etc/ecs/ecs.config
-                        echo "NO_PROXY=169.254.169.254,169.254.170.2,/var/run/docker.sock" >> /etc/ecs/ecs.config
+                        echo "NO_PROXY=$NO_PROXY" >> /etc/ecs/ecs.config
                         echo "$$: $(date +%s.%N | cut -b1-13)" > /var/lib/cloud/instance/sem/config_ecs-agent_http_proxy
                     fi
 
@@ -248,37 +250,40 @@ Resources:
                             owner: root
                             group: root
                             content: !Sub |
-                               description "Register gitlab runner on Amazon ECS container instance"
-                               author "wadahiro@gmail.com"
-                               start on started ecs
-                               
-                               script
-                                   exec 2>>/var/log/gitlab-runner-register.log
-                                   set -x
-                               
-                                   until curl -s http://localhost:51678/v1/metadata
-                                   do
-                                       sleep 1
-                                   done
-                               
-                                   docker run \
-                                     --rm \
-                                     -v /srv/gitlab-runner/config:/etc/gitlab-runner \
-                                     --dns ${RunnerDNS} \
-                                     gitlab/gitlab-runner:alpine-v1.11.1 register \
-                                     --non-interactive \
-                                     --url "${GitLabURL}" \
-                                     --registration-token "${RunnerRegistrationToken}" \
-                                     --executor "docker" \
-                                     --docker-image busyboox \
-                                     --env ${RunnerEnvironment} \
-                                     --docker-dns ${RunnerDNS} \
-                                     --docker-privileged=${RunnerPrivileged} \
-                                     --docker-extra-hosts=${RunnerExtraHosts} \
-                                     --docker-volumes=/var/run/docker.sock:/var/run/docker.sock \
-                                     --docker-pull-policy=${RunnerPullPolicy}
+                                description "Register gitlab runner on Amazon ECS container instance"
+                                author "wadahiro@gmail.com"
+                                start on started ecs
+                                
+                                script
+                                    exec 2>>/var/log/gitlab-runner-register.log
+                                    set -x
+                                
+                                    until curl -s http://localhost:51678/v1/metadata
+                                    do
+                                        sleep 1
+                                    done
+                                
+                                    AWSINSTANCEID=`curl -ss http://169.254.169.254/latest/meta-data/instance-id`
 
-                               end script
+                                    docker run \
+                                      --rm \
+                                      -v /srv/gitlab-runner/config:/etc/gitlab-runner \
+                                      --dns ${DNSServer} \
+                                      gitlab/gitlab-runner:alpine-v1.11.1 register \
+                                      --non-interactive \
+                                      --description="${AWSINSTANCEID} in ${AWS::Region} (Created by ${AWS::StackName})"
+                                      --url="${GitLabURL}" \
+                                      --registration-token="${RunnerRegistrationToken}" \
+                                      --executor="docker" \
+                                      --docker-image=busyboox \
+                                      --env=${RunnerEnvironment} \
+                                      --docker-dns=${DNSServer} \
+                                      --docker-privileged=${RunnerPrivileged} \
+                                      --docker-extra-hosts=${RunnerExtraHosts} \
+                                      --docker-volumes=/var/run/docker.sock:/var/run/docker.sock \
+                                      --docker-pull-policy=${RunnerPullPolicy}
+
+                                end script
 
                     services: 
                         sysvinit:
