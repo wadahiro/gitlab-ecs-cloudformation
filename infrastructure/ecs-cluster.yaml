@@ -47,6 +47,10 @@ Parameters:
         Description: Proxy port
         Type: Number
 
+    NoProxy:
+        Description: No proxy
+        Type: String
+
     DNSServer:
         Description: DNS server
         Type: String
@@ -181,7 +185,7 @@ Resources:
 
                     PROXY_HOST=${ProxyHost}
                     PROXY_PORT=${ProxyPort}
-                    NO_PROXY=169.254.169.254,169.254.170.2,/var/run/docker.sock
+                    NO_PROXY=169.254.169.254,169.254.170.2,/var/run/docker.sock,${NoProxy}
 
                     # Update ROOT CA Certificate
                     cat << EOS > /etc/pki/ca-trust/source/anchors/rootca.crt
