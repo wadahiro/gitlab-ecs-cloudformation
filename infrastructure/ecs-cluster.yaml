@@ -208,6 +208,12 @@ Resources:
                         echo "$$: $(date +%s.%N | cut -b1-13)" > /var/lib/cloud/instance/sem/config_docker_http_proxy
                     fi
 
+                    # Set Docker DNS
+                    if [ ! -f /var/lib/cloud/instance/sem/config_docker_dns ] && [ "${DNSServer}" != "" ]; then
+                        sed -i -e 's/\(^OPTIONS=.*\)"$/\1 --dns ${DNSServer}"/' /etc/sysconfig/docker
+                        echo "$$: $(date +%s.%N | cut -b1-13)" > /var/lib/cloud/instance/sem/config_docker_dns
+                    fi
+
                     # Set ECS agent HTTP proxy
                     if [ ! -f /var/lib/cloud/instance/sem/config_ecs-agent_http_proxy ]; then
                         echo "ECS_CLUSTER=${ECSCluster}" >> /etc/ecs/ecs.config
