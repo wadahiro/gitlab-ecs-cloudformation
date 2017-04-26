@@ -37,6 +37,10 @@ Parameters:
     ProxyPort:
         Description: Proxy port.
         Type: Number
+
+    NoProxy:
+        Description: No proxy
+        Type: String
         
     DNSServer:
         Description: DNS server
@@ -116,6 +120,7 @@ Resources:
                 RootCACrt: !Ref RootCACrt
                 ProxyHost: !Ref ProxyHost
                 ProxyPort: !Ref ProxyPort
+                NoProxy: !Ref NoProxy
                 DNSServer: !Ref DNSServer
                 GitLabURL: !Ref GitLabURL
                 RunnerRegistrationToken: !Ref RunnerRegistrationToken

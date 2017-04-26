@@ -281,7 +281,7 @@ Resources:
                                       --dns ${DNSServer} \
                                       gitlab/gitlab-runner:alpine-v1.11.1 register \
                                       --non-interactive \
-                                      --description="$AWSINSTANCEID in ${AWS::Region} (Created by ${AWS::StackName})"
+                                      --description="$AWSINSTANCEID in ${AWS::Region} (Created by ${AWS::StackName})" \
                                       --url="${GitLabURL}" \
                                       --registration-token="${RunnerRegistrationToken}" \
                                       --executor="docker" \
