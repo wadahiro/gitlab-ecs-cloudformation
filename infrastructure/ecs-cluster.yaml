@@ -39,6 +39,11 @@ Parameters:
         Description: ROOT CA Certificate
         Type: String
 
+    ProxyResolveEntry:
+        Description: Proxy resolve entry
+        Type: String
+        Default: ""
+
     ProxyHost:
         Description: Proxy host
         Type: String
@@ -182,6 +187,10 @@ Resources:
                 "Fn::Base64": !Sub |
                     #cloud-boothook
                     #!/bin/bash
+
+                    if [ "${ProxyResolveEntry}" != "" ]; then
+                        echo "${ProxyResolveEntry}" >> /etc/hosts
+                    fi
 
                     PROXY_HOST=${ProxyHost}
                     PROXY_PORT=${ProxyPort}

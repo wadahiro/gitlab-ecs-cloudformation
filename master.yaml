@@ -30,6 +30,16 @@ Parameters:
         Description: ROOT CA Certificate
         Type: String
 
+    ProxyResolveIP:
+        Description: Proxy resolve ip.
+        Type: String
+        Default: ""
+        
+    ProxyResolveHost:
+        Description: Proxy resolve host.
+        Type: String
+        Default: ""
+        
     ProxyHost:
         Description: Proxy host.
         Type: String
@@ -118,6 +128,7 @@ Resources:
                 Subnets: !Ref Subnets
                 KeyName: !Ref KeyName
                 RootCACrt: !Ref RootCACrt
+                ProxyResolveEntry: !Sub ${ProxyResolveIP} ${ProxyResolveHost}
                 ProxyHost: !Ref ProxyHost
                 ProxyPort: !Ref ProxyPort
                 NoProxy: !Ref NoProxy
