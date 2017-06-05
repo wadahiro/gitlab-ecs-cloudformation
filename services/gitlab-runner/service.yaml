@@ -30,6 +30,11 @@ Parameters:
         Description: DNS server
         Type: String
 
+    Memory:
+        Description: Memory(MB) for gitlab-runner container
+        Type: Number
+        Default: 900
+
 Resources:
 
     Service: 
@@ -50,7 +55,7 @@ Resources:
                 - Name: gitlab-runer
                   Essential: true
                   Image: gitlab/gitlab-runner:alpine-v1.11.1
-                  Memory: 512
+                  Memory: !Ref Memory
                   MountPoints:
                       - SourceVolume: docker-sock 
                         ContainerPath: /var/run/docker.sock
