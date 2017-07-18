@@ -134,7 +134,7 @@ Mappings:
         eu-central-1:
             AMI: ami-ec2be583
         ap-northeast-1:
-            AMI: ami-f63f6f91
+            AMI: ami-e4657283
         ap-southeast-1:
             AMI: ami-a88530cb
         ap-southeast-2:
@@ -228,6 +228,10 @@ Resources:
                         echo "ECS_CLUSTER=${ECSCluster}" >> /etc/ecs/ecs.config
                         echo "HTTP_PROXY=$PROXY_HOST:$PROXY_PORT" >> /etc/ecs/ecs.config
                         echo "NO_PROXY=$NO_PROXY" >> /etc/ecs/ecs.config
+                        echo "ECS_ENGINE_TASK_CLEANUP_WAIT_DURATION=10m" >> /etc/ecs/ecs.config
+                        echo "ECS_IMAGE_CLEANUP_INTERVAL=10m" >> /etc/ecs/ecs.config
+                        echo "ECS_IMAGE_MINIMUM_CLEANUP_AGE=15m" >> /etc/ecs/ecs.config
+                        echo "ECS_NUM_IMAGES_DELETE_PER_CYCLE=10" >> /etc/ecs/ecs.config
                         echo "$$: $(date +%s.%N | cut -b1-13)" > /var/lib/cloud/instance/sem/config_ecs-agent_http_proxy
                     fi
 
